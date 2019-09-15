@@ -1,4 +1,7 @@
 /locals
 /locals/**
-/tools
-/tools/**
+/tools/__*
+/tools/__*/**
+
+/apkpath.txt
+/ndkpath.txt

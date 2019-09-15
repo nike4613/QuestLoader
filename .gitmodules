@@ -1,0 +1,3 @@
+[submodule "RiDyL"]
+    path = RiDyL
+    url = ssh://git@github.com:nike4613/RiDyL.git

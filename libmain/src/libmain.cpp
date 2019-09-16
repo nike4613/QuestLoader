@@ -43,23 +43,30 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
     if (libUnityHandle != nullptr)
         return true;
 
+    logf(ANDROID_LOG_VERBOSE, "Searching in %s", soname);
+
     JavaVM* vm = nullptr;
-    auto unityVm = vm;
 
     if (env->GetJavaVM(&vm) < 0) {
         env->FatalError("Unable to retrieve Java VM"); // libmain wording
         return false; // doesn't actually reach here
     }
+    
+    auto unityVm = vm;
 
+    log(ANDROID_LOG_VERBOSE, "Got JVM");
 
     { // try load libmodloader
         soname[len] = '/';
         // because std::copy returns the element after the last copied, which is what we want to be null
         auto endptr = std::copy(std::begin(modloaderso), std::end(modloaderso), soname + len + 1);
         *endptr = 0;
+        
+        logf(ANDROID_LOG_VERBOSE, "Looking for libmodloader at %s", soname);
 
         libModLoader = dlopen(soname, RTLD_LAZY);
         if (libModLoader == nullptr) {
+            logf(ANDROID_LOG_VERBOSE, "Looking for libmodloader as %s", modloaderso.data());
             libModLoader = dlopen(modloaderso.data(), RTLD_LAZY);
             if (libUnityHandle == nullptr) {
                 auto err = dlerror();
@@ -68,13 +75,15 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             }
         }
 
+        log(ANDROID_LOG_VERBOSE, "Loaded libmodloader");
+
         auto main = reinterpret_cast<modloader_main_t*>(dlsym(libModLoader, "modloader_main"));
         if (main == nullptr) {
             log(ANDROID_LOG_WARN, "libmodloader does not have modloader_main");
             goto loadLibUnity;
         }
 
-        log(ANDROID_LOG_WARN, "Using libmodloader");
+        log(ANDROID_LOG_VERBOSE, "Using libmodloader's modloader_main");
         libUnityNInterface = main(vm, env, soname);
 
         unityVm = &libUnityVm;

@@ -6,6 +6,9 @@
 #include "libmain/utils.hpp"
 
 #define LIBMAIN_EXPORT __attribute__((visibility("default")))
+#define CHECK_MODLOADER_MAIN \
+    static_assert(::std::is_same_v<std::remove_reference_t<(&::modloader_main)>, ::jni::modloader_main_t*>, \
+    "modloader_main either has the wrong signature, or does not exist!")
 
 namespace jni {
 

@@ -7,11 +7,11 @@
 #include <cstddef>
 
 constexpr std::array<JNINativeMethod, 2> NativeLoader_bindings = {{
-    { "load",   "(Ljava/lang/String;)Z", (void*)&jni::NativeLoader::load   },
-    { "unload", "()Z",                   (void*)&jni::NativeLoader::unload }
+    { "load",   "(Ljava/lang/String;)Z", (void*)&jni::load   },
+    { "unload", "()Z",                   (void*)&jni::unload }
 }};
 
-extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
+extern "C" jint LIBMAIN_EXPORT JNI_OnLoad(JavaVM* vm, void*) {
     JNIEnv* env = nullptr;
 
     log(ANDROID_LOG_INFO, "JNI_OnLoad called, linking JNI methods");
@@ -34,6 +34,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     return JNI_VERSION_1_6;
 }
 
-extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
+extern "C" void LIBMAIN_EXPORT JNI_OnUnload(JavaVM* vm, void*) {
     log(ANDROID_LOG_INFO, "JNI_OnUnload called");
 }

@@ -10,19 +10,28 @@
 #include <dlfcn.h>
 
 #include <memory>
-#include <string_view>
 #include <array>
 
 using namespace std::literals;
+using namespace jni;
 
+static void* libModLoader = nullptr;
 static void* libUnityHandle = nullptr;
 
-jboolean jni::NativeLoader::load(JNIEnv* env, jobject klass, jstring str) noexcept {
+// this is needed because libUnity stores the pointer, so this can never be invalidated
+static JNINativeInterface libUnityNInterface = {};
+static JNIEnv libUnityEnv = {&libUnityNInterface};
+static JNIInvokeInterface libUnityIInterface = {};
+static JavaVM libUnityVm = {&libUnityIInterface};
+
+jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
     auto const len = env->GetStringUTFLength(str);
 
-    constexpr auto sobasename = "libunity.so"sv;
+    constexpr auto unityso = "libunity.so"sv;
+    constexpr auto modloaderso = "libmodloader.so"sv;
+    constexpr auto sonameLen = std::max(unityso.length(), modloaderso.length());
 
-    char soname[len + 1 + sobasename.length() + 1]; // use stack local to prevent allocation
+    char soname[len + 1 + sonameLen + 1]; // use stack local to prevent allocation
     soname[len] = 0;
 
     {
@@ -35,41 +44,131 @@ jboolean jni::NativeLoader::load(JNIEnv* env, jobject klass, jstring str) noexce
         return true;
 
     JavaVM* vm = nullptr;
+    auto unityVm = vm;
 
     if (env->GetJavaVM(&vm) < 0) {
         env->FatalError("Unable to retrieve Java VM"); // libmain wording
         return false; // doesn't actually reach here
     }
 
-    soname[len] = '/';
-    // because std::copy returns the element after the last copied, which is what we want to be null
-    *std::copy(std::begin(sobasename), std::end(sobasename), soname + len + 1) = 0;
 
-    libUnityHandle = dlopen(soname, RTLD_LAZY);
-    if (libUnityHandle == nullptr) {
-        libUnityHandle = dlopen(sobasename.data(), RTLD_LAZY);
-        if (libUnityHandle == nullptr) {
-            auto err = dlerror();
-            logf(ANDROID_LOG_WARN, "Could not load libunity.so from %s: %s", soname, err);
-            std::array<char, 0x400> message = {0}; // this is what the original libmain allocates, so lets hope its enough
-                                                   // and doesn't use all of the rest of our stack space
-            snprintf(message.data(), message.size(), "Unable to load library: %s [%s]", soname, err);
-            env->FatalError(message.data());
-            return false; // doesn't actually reach here
+    { // try load libmodloader
+        soname[len] = '/';
+        // because std::copy returns the element after the last copied, which is what we want to be null
+        auto endptr = std::copy(std::begin(modloaderso), std::end(modloaderso), soname + len + 1);
+        *endptr = 0;
+
+        libModLoader = dlopen(soname, RTLD_LAZY);
+        if (libModLoader == nullptr) {
+            libModLoader = dlopen(modloaderso.data(), RTLD_LAZY);
+            if (libUnityHandle == nullptr) {
+                auto err = dlerror();
+                logf(ANDROID_LOG_WARN, "Could not load libmodloader.so from %s: %s", soname, err);
+                goto loadLibUnity;
+            }
         }
+
+        auto main = reinterpret_cast<modloader_main_t*>(dlsym(libModLoader, "modloader_main"));
+        if (main == nullptr) {
+            log(ANDROID_LOG_WARN, "libmodloader does not have modloader_main");
+            goto loadLibUnity;
+        }
+
+        log(ANDROID_LOG_WARN, "Using libmodloader");
+        libUnityNInterface = main(vm, env, soname);
+
+        unityVm = &libUnityVm;
+        libUnityIInterface = interface::make_passthrough_interface<JNIInvokeInterface>(&vm->functions);
+        libUnityIInterface.AttachCurrentThread = [](JavaVM* ptr, JNIEnv** envp, void* aarg) {
+            auto orig = interface::interface_original(ptr->functions);
+            
+            JNIEnv* env;
+            auto ret = (*orig)->AttachCurrentThread(reinterpret_cast<JavaVM*>(orig), &env, aarg);
+
+            // this will absolutely leak, but hopefully it won't matter enough to be scary
+            // TODO: get rid of these news somehow to reduce binary size (they pull in a load of code)
+            //auto ifacePtr = new JNINativeInterface(libUnityNInterface);
+            //auto envPtr = new JNIEnv({ifacePtr});
+            if (interface::interface_original(&libUnityNInterface) != const_cast<JNINativeInterface**>(&env->functions)) {
+                logf(ANDROID_LOG_WARN, "AttachCurrentThread expected state does not hold (%d)", __LINE__);
+            }
+
+            interface::interface_original(&libUnityNInterface) = const_cast<JNINativeInterface**>(&env->functions);
+
+            *envp = &libUnityEnv;
+            return ret;
+        };
+        libUnityIInterface.AttachCurrentThreadAsDaemon = [](JavaVM* ptr, JNIEnv** envp, void* aarg) {
+            auto orig = interface::interface_original(ptr->functions);
+            
+            JNIEnv* env;
+            auto ret = (*orig)->AttachCurrentThreadAsDaemon(reinterpret_cast<JavaVM*>(orig), &env, aarg);
+
+            // this will absolutely leak, but hopefully it won't matter enough to be scary
+            //auto ifacePtr = new JNINativeInterface(libUnityNInterface);
+            //auto envPtr = new JNIEnv({ifacePtr});
+            if (interface::interface_original(&libUnityNInterface) != const_cast<JNINativeInterface**>(&env->functions)) {
+                logf(ANDROID_LOG_WARN, "AttachCurrentThread expected state does not hold (%d)", __LINE__);
+            }
+
+            interface::interface_original(&libUnityNInterface) = const_cast<JNINativeInterface**>(&env->functions);
+
+            *envp = &libUnityEnv;
+            return ret;
+        };
+        libUnityIInterface.GetEnv = [](JavaVM* ptr, void** envp, jint ver) {
+            auto orig = interface::interface_original(ptr->functions);
+            
+            JNIEnv* env;
+            auto ret = (*orig)->GetEnv(reinterpret_cast<JavaVM*>(orig), reinterpret_cast<void**>(&env), ver);
+
+            // this will absolutely leak, but hopefully it won't matter enough to be scary
+            //auto ifacePtr = new JNINativeInterface(libUnityNInterface);
+            //auto envPtr = new JNIEnv({ifacePtr});
+            if (interface::interface_original(&libUnityNInterface) != const_cast<JNINativeInterface**>(&env->functions)) {
+                logf(ANDROID_LOG_WARN, "AttachCurrentThread expected state does not hold (%d)", __LINE__);
+            }
+
+            interface::interface_original(&libUnityNInterface) = const_cast<JNINativeInterface**>(&env->functions);
+
+            *envp = &libUnityEnv;
+            return ret;
+        };
     }
 
-    using JNI_OnLoad_t = jint(JavaVM*, void*);
+    loadLibUnity:
+    { // try load libunity
+        soname[len] = '/';
+        // because std::copy returns the element after the last copied, which is what we want to be null
+        auto endptr = std::copy(std::begin(unityso), std::end(unityso), soname + len + 1);
+        *endptr = 0;
 
-    auto onload = reinterpret_cast<JNI_OnLoad_t*>(dlsym(libUnityHandle, "JNI_OnLoad"));
-    if (onload != nullptr) {
-        if (onload(vm, nullptr) > JNI_VERSION_1_6) {
-            log(ANDROID_LOG_WARN, "libunity JNI_OnLoad requested unsupported VM version");
-            env->FatalError("Unsupported VM version"); // libmain wording
-            return false; // doesn't actually reach here
+        libUnityHandle = dlopen(soname, RTLD_LAZY);
+        if (libUnityHandle == nullptr) {
+            libUnityHandle = dlopen(unityso.data(), RTLD_LAZY);
+            if (libUnityHandle == nullptr) {
+                auto err = dlerror();
+                logf(ANDROID_LOG_WARN, "Could not load libunity.so from %s: %s", soname, err);
+                std::array<char, 0x400> message = {0}; // this is what the original libmain allocates, so lets hope its enough
+                                                    // and doesn't use all of the rest of our stack space
+                snprintf(message.data(), message.size(), "Unable to load library: %s [%s]", soname, err);
+                env->FatalError(message.data());
+                return false; // doesn't actually reach here
+            }
         }
-    } else {
-        log(ANDROID_LOG_INFO, "libunity does not have a JNI_OnLoad");
+
+        using JNI_OnLoad_t = jint(JavaVM*, void*);
+
+        auto onload = reinterpret_cast<JNI_OnLoad_t*>(dlsym(libUnityHandle, "JNI_OnLoad"));
+        if (onload != nullptr) {
+            if (onload(unityVm, nullptr) > JNI_VERSION_1_6) {
+                log(ANDROID_LOG_WARN, "libunity JNI_OnLoad requested unsupported VM version");
+                env->FatalError("Unsupported VM version"); // libmain wording
+                return false; // doesn't actually reach here
+            }
+        } else {
+            log(ANDROID_LOG_INFO, "libunity does not have a JNI_OnLoad");
+        }
     }
 
     logf(ANDROID_LOG_INFO, "Successfully loaded and initialized %s", soname);
@@ -77,7 +176,7 @@ jboolean jni::NativeLoader::load(JNIEnv* env, jobject klass, jstring str) noexce
     return libUnityHandle != nullptr;
 }
 
-jboolean jni::NativeLoader::unload(JNIEnv* env, jobject klass) noexcept {
+jboolean jni::unload(JNIEnv* env, jobject klass) noexcept {
     JavaVM* vm = nullptr;
 
     if (env->GetJavaVM(&vm) < 0) {
@@ -89,7 +188,7 @@ jboolean jni::NativeLoader::unload(JNIEnv* env, jobject klass) noexcept {
 
     auto onunload = reinterpret_cast<JNI_OnUnload_t*>(dlsym(libUnityHandle, "JNI_OnUnload"));
     if (onunload != nullptr) {
-        onunload(vm, nullptr);
+        onunload(&libUnityVm, nullptr);
     } else {
         log(ANDROID_LOG_INFO, "libunity does not have a JNI_OnUnload");
     }
@@ -100,6 +199,15 @@ jboolean jni::NativeLoader::unload(JNIEnv* env, jobject klass) noexcept {
         logf(ANDROID_LOG_WARN, "Error occurred closing libunity: %s", dlerror());
     } else {
         log(ANDROID_LOG_INFO, "Successfully closed libunity");
+    }
+
+    if (libModLoader != nullptr) {
+        code = dlclose(libModLoader);
+        if (code != 0) {
+            logf(ANDROID_LOG_WARN, "Error occurred closing libModLoader: %s", dlerror());
+        } else {
+            log(ANDROID_LOG_INFO, "Successfully closed libModLoader");
+        }
     }
 
     return true;

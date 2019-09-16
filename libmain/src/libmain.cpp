@@ -23,6 +23,7 @@ static JNINativeInterface libUnityNInterface = {};
 static JNIEnv libUnityEnv = {&libUnityNInterface};
 static JNIInvokeInterface libUnityIInterface = {};
 static JavaVM libUnityVm = {&libUnityIInterface};
+static bool usingCustomVm = false;
 
 jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
     auto const len = env->GetStringUTFLength(str);
@@ -51,7 +52,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         env->FatalError("Unable to retrieve Java VM"); // libmain wording
         return false; // doesn't actually reach here
     }
-    
+
     auto unityVm = vm;
 
     log(ANDROID_LOG_VERBOSE, "Got JVM");
@@ -86,6 +87,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         log(ANDROID_LOG_VERBOSE, "Using libmodloader's modloader_main");
         libUnityNInterface = main(vm, env, soname);
 
+        usingCustomVm = true;
         unityVm = &libUnityVm;
         libUnityIInterface = interface::make_passthrough_interface<JNIInvokeInterface>(&vm->functions);
         libUnityIInterface.AttachCurrentThread = [](JavaVM* ptr, JNIEnv** envp, void* aarg) {
@@ -197,9 +199,9 @@ jboolean jni::unload(JNIEnv* env, jobject klass) noexcept {
 
     auto onunload = reinterpret_cast<JNI_OnUnload_t*>(dlsym(libUnityHandle, "JNI_OnUnload"));
     if (onunload != nullptr) {
-        onunload(&libUnityVm, nullptr);
+        onunload(usingCustomVm ? &libUnityVm : vm, nullptr);
     } else {
-        log(ANDROID_LOG_INFO, "libunity does not have a JNI_OnUnload");
+        log(ANDROID_LOG_WARN, "libunity does not have a JNI_OnUnload");
     }
 
     int code = dlclose(libUnityHandle);
@@ -207,7 +209,7 @@ jboolean jni::unload(JNIEnv* env, jobject klass) noexcept {
     if (code != 0) {
         logf(ANDROID_LOG_WARN, "Error occurred closing libunity: %s", dlerror());
     } else {
-        log(ANDROID_LOG_INFO, "Successfully closed libunity");
+        log(ANDROID_LOG_VERBOSE, "Successfully closed libunity");
     }
 
     if (libModLoader != nullptr) {
@@ -215,7 +217,7 @@ jboolean jni::unload(JNIEnv* env, jobject klass) noexcept {
         if (code != 0) {
             logf(ANDROID_LOG_WARN, "Error occurred closing libModLoader: %s", dlerror());
         } else {
-            log(ANDROID_LOG_INFO, "Successfully closed libModLoader");
+            log(ANDROID_LOG_VERBOSE, "Successfully closed libModLoader");
         }
     }
 

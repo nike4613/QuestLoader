@@ -7,8 +7,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-      with:
-        path: ${GITHUB_WORKSPACE}/loader/
   setup:
     runs-on: ubuntu-latest
     steps:
@@ -33,7 +31,7 @@ jobs:
     steps:
     - name: Build
       run: |
-        pwd > ${GITHUB_WORKSPACE}/loader/ndkpath.txt
-        echo "/ndk" >> ${GITHUB_WORKSPACE}/loader/ndkpath.txt
-        cd ${GITHUB_WORKSPACE}/loader
+        cd ndk
+        pwd > ${GITHUB_WORKSPACE}/ndkpath.txt
+        cd ${GITHUB_WORKSPACE}
         pwsh -Command ./patch.ps1

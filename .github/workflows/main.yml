@@ -25,5 +25,4 @@ jobs:
     - name: Build
       run: |
         cd ${GITHUB_WORKSPACE}
-        ls -l
         pwsh -Command ./build.ps1

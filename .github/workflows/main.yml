@@ -1,0 +1,39 @@
+name: CI
+
+on: [push]
+
+jobs:
+  checkout:
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        path: ${GITHUB_WORKSPACE}/loader/
+  setup:
+    steps:
+    - name: Install .NET Core
+      uses: actions/setup-dotnet@v1.0.0
+      with:
+        dotnet-version: '2.2.103' # SDK Version to use.
+  setup-platform:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Powershell
+      run: apt-get install -y powershell
+    - name: Install Android NDK
+      env:
+        ndk-name: android-ndk-r20
+      run: |
+        wget -O ndk.zip https://dl.google.com/android/repository/${ndk-name}-linux-x86_64.zip
+        unzip ndk.zip -q
+        mv ${ndk-name} ndk
+  build:
+    needs: [setup-platform, checkout]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Build
+      run: |
+        pwd > ${GITHUB_WORKSPACE}/loader/ndkpath.txt
+        echo "/ndk" >> ${GITHUB_WORKSPACE}/loader/ndkpath.txt
+        cd ${GITHUB_WORKSPACE}/loader
+        pwsh -Command ./patch.ps1

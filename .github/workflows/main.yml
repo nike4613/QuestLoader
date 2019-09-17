@@ -3,7 +3,7 @@ name: CI
 on: [push]
 
 jobs:
-  setup:
+  build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
@@ -22,10 +22,6 @@ jobs:
         mv ${ndkname} ndk
         cd ndk
         pwd > ${GITHUB_WORKSPACE}/ndkpath.txt
-  build:
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
     - name: Build
       run: |
         cd ${GITHUB_WORKSPACE}

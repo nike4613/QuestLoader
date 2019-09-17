@@ -17,9 +17,8 @@ jobs:
       env:
         ndkname: android-ndk-r20
       run: |
-        echo "Downloading NDK"
         wget -q -O ndk.zip https://dl.google.com/android/repository/${ndkname}-linux-x86_64.zip
-        unzip ndk.zip
+        unzip -q ndk.zip
         mv ${ndkname} ndk
         cd ndk
         pwd > ${GITHUB_WORKSPACE}/ndkpath.txt

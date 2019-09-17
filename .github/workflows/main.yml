@@ -20,11 +20,11 @@ jobs:
       run: sudo apt-get install -y powershell
     - name: Install Android NDK
       env:
-        ndk-name: android-ndk-r20
+        ndkname: android-ndk-r20
       run: |
-        wget -O ndk.zip https://dl.google.com/android/repository/${ndk-name}-linux-x86_64.zip
+        wget -O ndk.zip https://dl.google.com/android/repository/${ndkname}-linux-x86_64.zip
         unzip ndk.zip -q
-        mv ${ndk-name} ndk
+        mv ${ndkname} ndk
   build:
     needs: [setup, checkout]
     runs-on: ubuntu-latest

@@ -30,4 +30,5 @@ jobs:
     - name: Build
       run: |
         cd ${GITHUB_WORKSPACE}
-        pwsh -Command ./patch.ps1
+        ls -l
+        pwsh -Command ./build.ps1

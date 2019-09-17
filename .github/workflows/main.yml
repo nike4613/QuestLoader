@@ -23,7 +23,7 @@ jobs:
         ndkname: android-ndk-r20
       run: |
         wget -q -O ndk.zip https://dl.google.com/android/repository/${ndkname}-linux-x86_64.zip
-        unzip ndk.zip -q
+        unzip -q ndk.zip -d .
         mv ${ndkname} ndk
   build:
     needs: [setup, checkout]

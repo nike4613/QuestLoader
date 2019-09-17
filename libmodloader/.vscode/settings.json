@@ -1,0 +1,8 @@
+{
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.cStandard": "c99",
+    "C_Cpp.default.includePath": [
+        "${workspaceRoot}/include", "${workspaceRoot}/src"
+    ],
+    "C_Cpp.intelliSenseEngineFallback": "Enabled"
+}

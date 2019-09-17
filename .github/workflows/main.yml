@@ -4,20 +4,18 @@ on: [push]
 
 jobs:
   checkout:
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
       with:
         path: ${GITHUB_WORKSPACE}/loader/
   setup:
+    runs-on: ubuntu-latest
     steps:
     - name: Install .NET Core
       uses: actions/setup-dotnet@v1.0.0
       with:
         dotnet-version: '2.2.103' # SDK Version to use.
-  setup-platform:
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
     - name: Install Powershell
       run: apt-get install -y powershell
     - name: Install Android NDK

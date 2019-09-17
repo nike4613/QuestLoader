@@ -80,7 +80,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
 
         auto main = reinterpret_cast<modloader_main_t*>(dlsym(libModLoader, "modloader_main"));
         if (main == nullptr) {
-            log(ANDROID_LOG_WARN, "libmodloader does not have modloader_main");
+            logf(ANDROID_LOG_WARN, "libmodloader does not have modloader_main: %s", dlerror());
             goto loadLibUnity;
         }
 
@@ -97,9 +97,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             auto ret = (*orig)->AttachCurrentThread(reinterpret_cast<JavaVM*>(orig), &env, aarg);
 
             // this will absolutely leak, but hopefully it won't matter enough to be scary
-            // TODO: get rid of these news somehow to reduce binary size (they pull in a load of code)
-            //auto ifacePtr = new JNINativeInterface(libUnityNInterface);
-            //auto envPtr = new JNIEnv({ifacePtr});
+            // TODO: this warning log occurs regularly, and seems to be a problem
             if (interface::interface_original(&libUnityNInterface) != const_cast<JNINativeInterface**>(&env->functions)) {
                 logf(ANDROID_LOG_WARN, "AttachCurrentThread expected state does not hold (%d)", __LINE__);
             }
@@ -180,6 +178,10 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         } else {
             log(ANDROID_LOG_INFO, "libunity does not have a JNI_OnLoad");
         }
+    }
+
+    { // TODO: add call into libmodloader with libunity.so handle
+
     }
 
     logf(ANDROID_LOG_INFO, "Successfully loaded and initialized %s", soname);

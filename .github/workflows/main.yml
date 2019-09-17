@@ -19,16 +19,15 @@ jobs:
       run: |
         echo "Downloading NDK"
         wget -q -O ndk.zip https://dl.google.com/android/repository/${ndkname}-linux-x86_64.zip
-        echo "Extracting NDK"
-        unzip -q ndk.zip -d .
+        unzip ndk.zip
         mv ${ndkname} ndk
+        cd ndk
+        pwd > ${GITHUB_WORKSPACE}/ndkpath.txt
   build:
     needs: setup
     runs-on: ubuntu-latest
     steps:
     - name: Build
       run: |
-        cd ndk
-        pwd > ${GITHUB_WORKSPACE}/ndkpath.txt
         cd ${GITHUB_WORKSPACE}
         pwsh -Command ./patch.ps1

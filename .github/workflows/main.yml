@@ -22,7 +22,7 @@ jobs:
       env:
         ndkname: android-ndk-r20
       run: |
-        wget -O ndk.zip https://dl.google.com/android/repository/${ndkname}-linux-x86_64.zip
+        wget -q -O ndk.zip https://dl.google.com/android/repository/${ndkname}-linux-x86_64.zip
         unzip ndk.zip -q
         mv ${ndkname} ndk
   build:

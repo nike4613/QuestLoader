@@ -17,8 +17,8 @@ Set-Location $libmainPath
 ."$libmainPath/build.ps1"
 Set-Location $PSScriptRoot
 
-Set-Location $libmainPath
-."$libmainPath/build.ps1"
+Set-Location $ridylPath
+."$ridylPath/build.ps1"
 Set-Location $PSScriptRoot
 
 Set-Location $libmodloaderPath

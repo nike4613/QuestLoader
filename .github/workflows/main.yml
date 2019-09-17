@@ -26,7 +26,7 @@ jobs:
         unzip ndk.zip -q
         mv ${ndk-name} ndk
   build:
-    needs: [setup-platform, checkout]
+    needs: [setup, checkout]
     runs-on: ubuntu-latest
     steps:
     - name: Build

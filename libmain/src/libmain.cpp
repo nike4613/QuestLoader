@@ -11,9 +11,14 @@
 
 #include <memory>
 #include <array>
+#include <map>
 
 using namespace std::literals;
 using namespace jni;
+
+// TODO: replace this with a custom map type to reduce binary size
+// (just having this pulls in a bunch of the standard library wich brings the binary size from 30k to 200k)
+static std::map<JNIEnv*, JNIEnv*> envPtrs = {};
 
 static void* libModLoader = nullptr;
 static void* libUnityHandle = nullptr;
@@ -95,16 +100,20 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             
             JNIEnv* env;
             auto ret = (*orig)->AttachCurrentThread(reinterpret_cast<JavaVM*>(orig), &env, aarg);
+            if (ret) return ret;
 
-            // this will absolutely leak, but hopefully it won't matter enough to be scary
-            // TODO: this warning log occurs regularly, and seems to be a problem
-            if (interface::interface_original(&libUnityNInterface) != const_cast<JNINativeInterface**>(&env->functions)) {
-                logf(ANDROID_LOG_WARN, "AttachCurrentThread expected state does not hold (%d)", __LINE__);
+            auto eptr = envPtrs.find(env);
+            if (eptr == envPtrs.end()) {
+                // we use one malloc to allocate the interface, and the JNIEnv ends up being stored in the extra reserved member.
+                auto interf = reinterpret_cast<JNINativeInterface*>(std::malloc(sizeof(JNINativeInterface)));
+                interface::interface_extra<JNINativeInterface>(interf) = interf;
+                auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
+                interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
+
+                eptr = envPtrs.insert({env, envptr}).first;
             }
 
-            interface::interface_original(&libUnityNInterface) = const_cast<JNINativeInterface**>(&env->functions);
-
-            *envp = &libUnityEnv;
+            *envp = eptr->second;
             return ret;
         };
         libUnityIInterface.AttachCurrentThreadAsDaemon = [](JavaVM* ptr, JNIEnv** envp, void* aarg) {
@@ -112,17 +121,20 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             
             JNIEnv* env;
             auto ret = (*orig)->AttachCurrentThreadAsDaemon(reinterpret_cast<JavaVM*>(orig), &env, aarg);
+            if (ret) return ret;
 
-            // this will absolutely leak, but hopefully it won't matter enough to be scary
-            //auto ifacePtr = new JNINativeInterface(libUnityNInterface);
-            //auto envPtr = new JNIEnv({ifacePtr});
-            if (interface::interface_original(&libUnityNInterface) != const_cast<JNINativeInterface**>(&env->functions)) {
-                logf(ANDROID_LOG_WARN, "AttachCurrentThread expected state does not hold (%d)", __LINE__);
+            auto eptr = envPtrs.find(env);
+            if (eptr == envPtrs.end()) {
+                // we use one malloc to allocate the interface, and the JNIEnv ends up being stored in the extra reserved member.
+                auto interf = reinterpret_cast<JNINativeInterface*>(std::malloc(sizeof(JNINativeInterface)));
+                interface::interface_extra<JNINativeInterface>(interf) = interf;
+                auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
+                interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
+
+                eptr = envPtrs.insert({env, envptr}).first;
             }
 
-            interface::interface_original(&libUnityNInterface) = const_cast<JNINativeInterface**>(&env->functions);
-
-            *envp = &libUnityEnv;
+            *envp = eptr->second;
             return ret;
         };
         libUnityIInterface.GetEnv = [](JavaVM* ptr, void** envp, jint ver) {
@@ -130,17 +142,20 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             
             JNIEnv* env;
             auto ret = (*orig)->GetEnv(reinterpret_cast<JavaVM*>(orig), reinterpret_cast<void**>(&env), ver);
+            if (ret) return ret;
 
-            // this will absolutely leak, but hopefully it won't matter enough to be scary
-            //auto ifacePtr = new JNINativeInterface(libUnityNInterface);
-            //auto envPtr = new JNIEnv({ifacePtr});
-            if (interface::interface_original(&libUnityNInterface) != const_cast<JNINativeInterface**>(&env->functions)) {
-                logf(ANDROID_LOG_WARN, "AttachCurrentThread expected state does not hold (%d)", __LINE__);
+            auto eptr = envPtrs.find(env);
+            if (eptr == envPtrs.end()) {
+                // we use one malloc to allocate the interface, and the JNIEnv ends up being stored in the extra reserved member.
+                auto interf = reinterpret_cast<JNINativeInterface*>(std::malloc(sizeof(JNINativeInterface)));
+                interface::interface_extra<JNINativeInterface>(interf) = interf;
+                auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
+                interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
+
+                eptr = envPtrs.insert({env, envptr}).first;
             }
 
-            interface::interface_original(&libUnityNInterface) = const_cast<JNINativeInterface**>(&env->functions);
-
-            *envp = &libUnityEnv;
+            *envp = eptr->second;
             return ret;
         };
     }

@@ -24,7 +24,8 @@ rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 
 LOCAL_LDLIBS    := -llog -ldl
 LOCAL_MODULE    := main
-LOCAL_CPPFLAGS  := -std=c++2a -fno-rtti -Os -fvisibility=hidden
+LOCAL_CPPFLAGS  := -std=c++2a -fno-rtti -O3 -fvisibility=hidden 
+LOCAL_LDFLAGS	:= -flto=full
 
 LOCAL_C_INCLUDES := ./include ./src
 LOCAL_SRC_FILES  := $(call rwildcard,src/,*.cpp)

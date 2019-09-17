@@ -33,11 +33,13 @@ namespace jni {
         struct interface_store_members<JNINativeInterface> {
             static constexpr void* JNINativeInterface::* original_member = &JNINativeInterface::reserved0;
             static constexpr void* JNINativeInterface::* user_member = &JNINativeInterface::reserved1;
+            static constexpr void* JNINativeInterface::* extra_member = &JNINativeInterface::reserved2;
         };
         template<>
         struct interface_store_members<JNIInvokeInterface> {
             static constexpr void* JNIInvokeInterface::* original_member = &JNIInvokeInterface::reserved0;
             static constexpr void* JNIInvokeInterface::* user_member = &JNIInvokeInterface::reserved1;
+            static constexpr void* JNIInvokeInterface::* extra_member = &JNIInvokeInterface::reserved2;
         };
 
         template<typename T>
@@ -49,6 +51,9 @@ namespace jni {
         template<typename U, typename T>
         U*& interface_user(T* i) noexcept
         { return reinterpret_cast<U*&>(i->*(interface_store_members<T>::user_member)); }
+        template<typename U, typename T>
+        U*& interface_extra(T* i) noexcept
+        { return reinterpret_cast<U*&>(i->*(interface_store_members<T>::extra_member)); }
     }
 }
 

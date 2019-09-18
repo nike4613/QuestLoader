@@ -5,13 +5,19 @@
 #include "libmain/utils.hpp"
 #include "libmain/_config.hpp"
 
-#define CHECK_MODLOADER_MAIN \
-    static_assert(::std::is_same_v<std::remove_reference_t<decltype(&modloader_main)>, ::jni::modloader_main_t*>, \
+#define CHECK_MODLOADER_FUNCTION(funcname) \
+    static_assert(::std::is_same_v<std::remove_reference_t<decltype(&modloader_##funcname)>, ::jni::modloader::funcname##_t*>, \
     "modloader_main either has the wrong signature, or does not exist!")
+
+#define CHECK_MODLOADER_MAIN CHECK_MODLOADER_FUNCTION(main)
+#define CHECK_MODLOADER_ACCEPT_UNITY_HANDLE CHECK_MODLOADER_FUNCTION(accept_unity_handle)
 
 namespace jni {
 
-    using modloader_main_t = JNINativeInterface(JavaVM* vm, JNIEnv* env, std::string_view loadSrc) noexcept;
+    namespace modloader {
+        using main_t = JNINativeInterface(JavaVM* vm, JNIEnv* env, std::string_view loadSrc) noexcept;
+        using accept_unity_handle_t = void(void* unityModuleHandle) noexcept;
+    }
 
     jboolean load(JNIEnv* env, jobject klass, jstring str) noexcept;
     jboolean unload(JNIEnv* env, jobject klass) noexcept;

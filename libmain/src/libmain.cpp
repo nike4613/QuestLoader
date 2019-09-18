@@ -81,7 +81,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
 
         log(ANDROID_LOG_VERBOSE, "Loaded libmodloader");
 
-        auto main = reinterpret_cast<modloader_main_t*>(dlsym(libModLoader, "modloader_main"));
+        auto main = reinterpret_cast<modloader::main_t*>(dlsym(libModLoader, "modloader_main"));
         if (main == nullptr) {
             logf(ANDROID_LOG_WARN, "libmodloader does not have modloader_main: %s", dlerror());
             goto loadLibUnity;
@@ -193,8 +193,15 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         }
     }
 
-    { // TODO: add call into libmodloader with libunity.so handle
+    if (libModLoader != nullptr) { // TODO: add call into libmodloader with libunity.so handle
+        auto acceptUHandle = reinterpret_cast<modloader::accept_unity_handle_t*>(dlsym(libModLoader, "modloader_accept_unity_handle"));
+        if (acceptUHandle == nullptr) {
+            logf(ANDROID_LOG_INFO, "libmodloader does not have modloader_accept_unity_handle: %s", dlerror());
+        } else {
+            log(ANDROID_LOG_VERBOSE, "Calling libmodloader's modloader_accept_unity_handle");
 
+            acceptUHandle(libUnityHandle);
+        }
     }
 
     logf(ANDROID_LOG_INFO, "Successfully loaded and initialized %s", soname);

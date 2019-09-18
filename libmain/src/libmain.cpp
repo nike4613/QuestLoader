@@ -102,8 +102,8 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
 
             auto eptr = envPtrs.find(env);
             if (eptr == envPtrs.end()) {
-                // we use one malloc to allocate the interface, and the JNIEnv ends up being stored in the extra reserved member.
-                auto interf = reinterpret_cast<JNINativeInterface*>(std::malloc(sizeof(JNINativeInterface)));
+                // the JNIEnv ends up being stored in the extra reserved member.
+                auto interf = new JNINativeInterface(libUnityNInterface);
                 interface::interface_extra<JNINativeInterface>(interf) = interf;
                 auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
                 interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
@@ -123,8 +123,8 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
 
             auto eptr = envPtrs.find(env);
             if (eptr == envPtrs.end()) {
-                // we use one malloc to allocate the interface, and the JNIEnv ends up being stored in the extra reserved member.
-                auto interf = reinterpret_cast<JNINativeInterface*>(std::malloc(sizeof(JNINativeInterface)));
+                // the JNIEnv ends up being stored in the extra reserved member.
+                auto interf = new JNINativeInterface(libUnityNInterface);
                 interface::interface_extra<JNINativeInterface>(interf) = interf;
                 auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
                 interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
@@ -144,8 +144,8 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
 
             auto eptr = envPtrs.find(env);
             if (eptr == envPtrs.end()) {
-                // we use one malloc to allocate the interface, and the JNIEnv ends up being stored in the extra reserved member.
-                auto interf = reinterpret_cast<JNINativeInterface*>(std::malloc(sizeof(JNINativeInterface)));
+                // the JNIEnv ends up being stored in the extra reserved member.
+                auto interf = new JNINativeInterface(libUnityNInterface);
                 interface::interface_extra<JNINativeInterface>(interf) = interf;
                 auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
                 interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);

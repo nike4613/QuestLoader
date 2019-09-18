@@ -47,7 +47,8 @@
 			"unordered_map": "cpp",
 			"utility": "cpp",
 			"vector": "cpp",
-			"version": "cpp"
+			"version": "cpp",
+			"map": "cpp"
 		}
 	}
 }

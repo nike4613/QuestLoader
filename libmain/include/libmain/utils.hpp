@@ -1,5 +1,4 @@
-#ifndef LIBMAIN_UTIL_H
-#define LIBMAIN_UTIL_H
+#pragma once
 
 #include <utility>
 #include <type_traits>
@@ -64,4 +63,3 @@ namespace util {
     using alias_t = T;
 
 }
-#endif

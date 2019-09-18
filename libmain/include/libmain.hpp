@@ -1,11 +1,10 @@
-#ifndef LIBMAIN_HPP
-#define LIBMAIN_HPP
+#pragma once
 
 #include <jni.h>
 #include <string_view>
 #include "libmain/utils.hpp"
+#include "libmain/_config.hpp"
 
-#define LIBMAIN_EXPORT __attribute__((visibility("default")))
 #define CHECK_MODLOADER_MAIN \
     static_assert(::std::is_same_v<std::remove_reference_t<decltype(&modloader_main)>, ::jni::modloader_main_t*>, \
     "modloader_main either has the wrong signature, or does not exist!")
@@ -56,5 +55,3 @@ namespace jni {
         { return reinterpret_cast<U*&>(i->*(interface_store_members<T>::extra_member)); }
     }
 }
-
-#endif

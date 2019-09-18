@@ -16,8 +16,6 @@
 using namespace std::literals;
 using namespace jni;
 
-// TODO: replace this with a custom map type to reduce binary size
-// (just having this pulls in a bunch of the standard library wich brings the binary size from 30k to 200k)
 static std::map<JNIEnv*, JNIEnv*> envPtrs = {};
 
 static void* libModLoader = nullptr;

@@ -10,4 +10,9 @@ extern "C" JNINativeInterface modloader_main(JavaVM* vm, JNIEnv* env, std::strin
     return jni::interface::make_passthrough_interface<JNINativeInterface>(&env->functions);
 }
 
+extern "C" void modloader_accept_unity_handle(void* uhandle) noexcept {
+    logf(ANDROID_LOG_VERBOSE, "modloader_accept_unity_handle called with uhandle: 0x%p", uhandle);
+}
+
 CHECK_MODLOADER_MAIN;
+CHECK_MODLOADER_ACCEPT_UNITY_HANDLE;

@@ -94,19 +94,19 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         unityVm = &libUnityVm;
         libUnityIInterface = interface::make_passthrough_interface<JNIInvokeInterface>(&vm->functions);
         libUnityIInterface.AttachCurrentThread = [](JavaVM* ptr, JNIEnv** envp, void* aarg) {
-            auto orig = interface::interface_original(ptr->functions);
+            using namespace interface;
             
             JNIEnv* env;
-            auto ret = (*orig)->AttachCurrentThread(reinterpret_cast<JavaVM*>(orig), &env, aarg);
+            auto ret = invoke_original(ptr, &JNIInvokeInterface::AttachCurrentThread, &env, aarg);
             if (ret) return ret;
 
             auto eptr = envPtrs.find(env);
             if (eptr == envPtrs.end()) {
                 // the JNIEnv ends up being stored in the extra reserved member.
                 auto interf = new JNINativeInterface(libUnityNInterface);
-                interface::interface_extra<JNINativeInterface>(interf) = interf;
-                auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
-                interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
+                interface_extra<JNINativeInterface>(interf) = interf;
+                auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
+                interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
 
                 eptr = envPtrs.insert({env, envptr}).first;
             }
@@ -115,19 +115,19 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             return ret;
         };
         libUnityIInterface.AttachCurrentThreadAsDaemon = [](JavaVM* ptr, JNIEnv** envp, void* aarg) {
-            auto orig = interface::interface_original(ptr->functions);
+            using namespace interface;
             
             JNIEnv* env;
-            auto ret = (*orig)->AttachCurrentThreadAsDaemon(reinterpret_cast<JavaVM*>(orig), &env, aarg);
+            auto ret = invoke_original(ptr, &JNIInvokeInterface::AttachCurrentThreadAsDaemon, &env, aarg);
             if (ret) return ret;
 
             auto eptr = envPtrs.find(env);
             if (eptr == envPtrs.end()) {
                 // the JNIEnv ends up being stored in the extra reserved member.
                 auto interf = new JNINativeInterface(libUnityNInterface);
-                interface::interface_extra<JNINativeInterface>(interf) = interf;
-                auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
-                interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
+                interface_extra<JNINativeInterface>(interf) = interf;
+                auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
+                interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
 
                 eptr = envPtrs.insert({env, envptr}).first;
             }
@@ -136,19 +136,19 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             return ret;
         };
         libUnityIInterface.GetEnv = [](JavaVM* ptr, void** envp, jint ver) {
-            auto orig = interface::interface_original(ptr->functions);
+            using namespace interface;
             
             JNIEnv* env;
-            auto ret = (*orig)->GetEnv(reinterpret_cast<JavaVM*>(orig), reinterpret_cast<void**>(&env), ver);
+            auto ret = invoke_original(ptr, &JNIInvokeInterface::GetEnv, reinterpret_cast<void**>(&env), ver);
             if (ret) return ret;
 
             auto eptr = envPtrs.find(env);
             if (eptr == envPtrs.end()) {
                 // the JNIEnv ends up being stored in the extra reserved member.
                 auto interf = new JNINativeInterface(libUnityNInterface);
-                interface::interface_extra<JNINativeInterface>(interf) = interf;
-                auto envptr = reinterpret_cast<JNIEnv*>(&interface::interface_extra<JNINativeInterface>(interf));
-                interface::interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
+                interface_extra<JNINativeInterface>(interf) = interf;
+                auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
+                interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
 
                 eptr = envPtrs.insert({env, envptr}).first;
             }
@@ -178,7 +178,20 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
                 return false; // doesn't actually reach here
             }
         }
+    }
 
+    if (libModLoader != nullptr) {
+        auto acceptUHandle = reinterpret_cast<modloader::accept_unity_handle_t*>(dlsym(libModLoader, "modloader_accept_unity_handle"));
+        if (acceptUHandle == nullptr) {
+            logf(ANDROID_LOG_INFO, "libmodloader does not have modloader_accept_unity_handle: %s", dlerror());
+        } else {
+            log(ANDROID_LOG_VERBOSE, "Calling libmodloader's modloader_accept_unity_handle");
+
+            acceptUHandle(libUnityHandle);
+        }
+    }
+
+    {
         using JNI_OnLoad_t = jint(JavaVM*, void*);
 
         auto onload = reinterpret_cast<JNI_OnLoad_t*>(dlsym(libUnityHandle, "JNI_OnLoad"));
@@ -190,17 +203,6 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             }
         } else {
             log(ANDROID_LOG_INFO, "libunity does not have a JNI_OnLoad");
-        }
-    }
-
-    if (libModLoader != nullptr) { // TODO: add call into libmodloader with libunity.so handle
-        auto acceptUHandle = reinterpret_cast<modloader::accept_unity_handle_t*>(dlsym(libModLoader, "modloader_accept_unity_handle"));
-        if (acceptUHandle == nullptr) {
-            logf(ANDROID_LOG_INFO, "libmodloader does not have modloader_accept_unity_handle: %s", dlerror());
-        } else {
-            log(ANDROID_LOG_VERBOSE, "Calling libmodloader's modloader_accept_unity_handle");
-
-            acceptUHandle(libUnityHandle);
         }
     }
 

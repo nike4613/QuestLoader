@@ -15,7 +15,9 @@
 namespace jni {
 
     namespace modloader {
+        // first, main is called. the interface it returns is given to LibUnity, but only after calling accept_unity_handle.
         using main_t = JNINativeInterface(JavaVM* vm, JNIEnv* env, std::string_view loadSrc) noexcept;
+        // this is called *before* calling LibUnity's JNI_OnLoad.
         using accept_unity_handle_t = void(void* unityModuleHandle) noexcept;
     }
 
@@ -59,5 +61,17 @@ namespace jni {
         template<typename U, typename T>
         U*& interface_extra(T* i) noexcept
         { return reinterpret_cast<U*&>(i->*(interface_store_members<T>::extra_member)); }
+
+        template<typename Iface, typename FType, typename ...Args>
+        auto invoke_original(Iface** self, FType* Iface::* member, Args&& ...args) {
+            auto original = interface_original(*self);
+            return ((*original)->*member)(original, std::forward<Args>(args)...);
+        }
+        template<typename IfaceWrap, typename FType, typename ...Args>
+        auto invoke_original(IfaceWrap* self, FType* std::remove_pointer_t<std::remove_reference_t<decltype(self->functions)>>::* member, Args&& ...args) {
+            using IfacePtr = std::remove_reference_t<decltype(self->functions)>;
+            auto original = interface_original(*reinterpret_cast<IfacePtr*>(self));
+            return ((*original)->*member)(reinterpret_cast<IfaceWrap*>(original), std::forward<Args>(args)...);
+        }
     }
 }

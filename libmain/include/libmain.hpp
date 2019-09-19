@@ -29,9 +29,6 @@ namespace jni {
 
     // both of these use the first reserved slot to hold the original; you should use the second for other data
     namespace interface {
-        // holy fuck all of this is terrible
-        // please someone tell me a better way to do this
-
         template<typename Interface>
         Interface LIBMAIN_EXPORT make_passthrough_interface(Interface const* const* i) noexcept;
 
@@ -50,17 +47,31 @@ namespace jni {
         };
 
         template<typename T>
+        using remove_ptr_ref_t = std::remove_cv_t<std::remove_pointer_t<std::remove_reference_t<T>>>;
+
+        template<typename T>
         T**& interface_original(T* i) noexcept
-        { return reinterpret_cast<T**&>((i)->*(interface_store_members<T>::original_member)); }
+        { return reinterpret_cast<T**&>(i->*(interface_store_members<T>::original_member)); }
         template<typename T>
         T**const& interface_original(T const* i) noexcept 
-        { return reinterpret_cast<T**const&>((i)->*(interface_store_members<T>::original_member)); }
+        { return reinterpret_cast<T**const&>(i->*(interface_store_members<T>::original_member)); }
+        template<typename T>
+        T*const& interface_original(T const i) noexcept
+        { return reinterpret_cast<T*const&>(i.functions->*(interface_store_members<remove_ptr_ref_t<decltype(std::declval<T>().functions)>>::original_member)); }
+
         template<typename U, typename T>
         U*& interface_user(T* i) noexcept
         { return reinterpret_cast<U*&>(i->*(interface_store_members<T>::user_member)); }
         template<typename U, typename T>
+        U*& interface_user(T i) noexcept
+        { return reinterpret_cast<U*&>(i.functions->*(interface_store_members<remove_ptr_ref_t<decltype(i.functions)>>::user_member)); }
+
+        template<typename U, typename T>
         U*& interface_extra(T* i) noexcept
         { return reinterpret_cast<U*&>(i->*(interface_store_members<T>::extra_member)); }
+        template<typename U, typename T>
+        U*& interface_extra(T i) noexcept
+        { return reinterpret_cast<U*&>(i.functions->*(interface_store_members<remove_ptr_ref_t<decltype(i.functions)>>::extra_member)); }
 
         template<typename Iface, typename FType, typename ...Args>
         auto invoke_original(Iface** self, FType* Iface::* member, Args&& ...args) {
@@ -68,8 +79,8 @@ namespace jni {
             return ((*original)->*member)(original, std::forward<Args>(args)...);
         }
         template<typename IfaceWrap, typename FType, typename ...Args>
-        auto invoke_original(IfaceWrap* self, FType* std::remove_pointer_t<std::remove_reference_t<decltype(self->functions)>>::* member, Args&& ...args) {
-            using IfacePtr = std::remove_reference_t<decltype(self->functions)>;
+        auto invoke_original(IfaceWrap* self, FType* remove_ptr_ref_t<decltype(self->functions)>::* member, Args&& ...args) {
+            using IfacePtr = remove_ptr_ref_t<decltype(self->functions)>*;
             auto original = interface_original(*reinterpret_cast<IfacePtr*>(self));
             return ((*original)->*member)(reinterpret_cast<IfaceWrap*>(original), std::forward<Args>(args)...);
         }

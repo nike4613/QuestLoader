@@ -9,9 +9,15 @@
 
 // there is *not* a good way to get the name lmao
 std::string get_jni_class_name(JNIEnv* env, jclass klass) {
-    
+    auto kl = env->GetObjectClass(klass);
+    auto mid = env->GetMethodID(kl, "getName", "()Ljava/lang/String;");
+    auto jstr = static_cast<jstring>(env->CallObjectMethod(klass, mid));
 
-    return {};
+    auto cstr = env->GetStringUTFChars(jstr, nullptr);
+    std::string name {cstr};
+    env->ReleaseStringUTFChars(jstr, cstr);
+
+    return name;
 }
 
 extern "C" JNINativeInterface modloader_main(JavaVM* vm, JNIEnv* env, std::string_view loadSrc) noexcept {
@@ -21,9 +27,10 @@ extern "C" JNINativeInterface modloader_main(JavaVM* vm, JNIEnv* env, std::strin
 
     iface.RegisterNatives = [](JNIEnv* env, jclass klass, JNINativeMethod const* methods_ptr, jint count) {
         using namespace jni::interface;
-
         std::span methods {methods_ptr, count};
-        auto clsname = get_jni_class_name(env, klass);
+        
+        // call it with interface_original so any modifications previously made to *this* JNIEnv don't affect it
+        auto clsname = get_jni_class_name(interface_original(*env), klass);
 
         for (auto method : methods) {
             logf(ANDROID_LOG_VERBOSE, "Unity registering native on %s: %s %s @ 0x%p", 

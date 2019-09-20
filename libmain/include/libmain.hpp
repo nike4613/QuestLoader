@@ -16,6 +16,7 @@ namespace jni {
 
     namespace modloader {
         // first, main is called. the interface it returns is given to LibUnity, but only after calling accept_unity_handle.
+        // if you redirect GetJavaVM, it will be redirected to keep the patched chain alive.
         using main_t = JNINativeInterface(JavaVM* vm, JNIEnv* env, std::string_view loadSrc) noexcept;
         // this is called *before* calling LibUnity's JNI_OnLoad.
         using accept_unity_handle_t = void(void* unityModuleHandle) noexcept;
@@ -29,6 +30,8 @@ namespace jni {
 
     // both of these use the first reserved slot to hold the original; you should use the second for other data
     namespace interface {
+        JNIEnv* LIBMAIN_EXPORT get_patched_env(JNIEnv*) noexcept;
+
         template<typename Interface>
         Interface LIBMAIN_EXPORT make_passthrough_interface(Interface const* const* i) noexcept;
 
@@ -51,24 +54,30 @@ namespace jni {
 
         template<typename T>
         T**& interface_original(T* i) noexcept
-        { return reinterpret_cast<T**&>(i->*(interface_store_members<T>::original_member)); }
+        { return reinterpret_cast<T**&>(i->*(interface_store_members<std::remove_cv_t<T>>::original_member)); }
         template<typename T>
         T**const& interface_original(T const* i) noexcept 
-        { return reinterpret_cast<T**const&>(i->*(interface_store_members<T>::original_member)); }
+        { return reinterpret_cast<T**const&>(i->*(interface_store_members<std::remove_cv_t<T>>::original_member)); }
         template<typename T>
         T*const& interface_original(T const i) noexcept
         { return reinterpret_cast<T*const&>(i.functions->*(interface_store_members<remove_ptr_ref_t<decltype(std::declval<T>().functions)>>::original_member)); }
 
         template<typename U, typename T>
         U*& interface_user(T* i) noexcept
-        { return reinterpret_cast<U*&>(i->*(interface_store_members<T>::user_member)); }
+        { return reinterpret_cast<U*&>(i->*(interface_store_members<std::remove_cv_t<T>>::user_member)); }
+        template<typename U, typename T>
+        U*const& interface_user(T const* i) noexcept
+        { return reinterpret_cast<U*const&>(i->*(interface_store_members<std::remove_cv_t<T>>::user_member)); }
         template<typename U, typename T>
         U*& interface_user(T i) noexcept
         { return reinterpret_cast<U*&>(i.functions->*(interface_store_members<remove_ptr_ref_t<decltype(i.functions)>>::user_member)); }
 
         template<typename U, typename T>
         U*& interface_extra(T* i) noexcept
-        { return reinterpret_cast<U*&>(i->*(interface_store_members<T>::extra_member)); }
+        { return reinterpret_cast<U*&>(i->*(interface_store_members<std::remove_cv_t<T>>::extra_member)); }
+        template<typename U, typename T>
+        U*const& interface_extra(T const* i) noexcept
+        { return reinterpret_cast<U*const&>(i->*(interface_store_members<std::remove_cv_t<T>>::extra_member)); }
         template<typename U, typename T>
         U*& interface_extra(T i) noexcept
         { return reinterpret_cast<U*&>(i.functions->*(interface_store_members<remove_ptr_ref_t<decltype(i.functions)>>::extra_member)); }

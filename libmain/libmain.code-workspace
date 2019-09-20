@@ -48,7 +48,8 @@
 			"utility": "cpp",
 			"vector": "cpp",
 			"version": "cpp",
-			"map": "cpp"
+			"map": "cpp",
+			"__tree": "cpp"
 		}
 	}
 }

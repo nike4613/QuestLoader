@@ -16,17 +16,38 @@
 using namespace std::literals;
 using namespace jni;
 
-static std::map<JNIEnv*, JNIEnv*> envPtrs = {};
+namespace {
+    static std::map<JNIEnv*, JNIEnv*> envPtrs = {};
 
-static void* libModLoader = nullptr;
-static void* libUnityHandle = nullptr;
+    static void* libModLoader = nullptr;
+    static void* libUnityHandle = nullptr;
 
-// this is needed because libUnity stores the pointer, so this can never be invalidated
-static JNINativeInterface libUnityNInterface = {};
-static JNIEnv libUnityEnv = {&libUnityNInterface};
-static JNIInvokeInterface libUnityIInterface = {};
-static JavaVM libUnityVm = {&libUnityIInterface};
-static bool usingCustomVm = false;
+    // this is needed because libUnity stores the pointer, so this can never be invalidated
+    static JNINativeInterface libUnityNInterface = {};
+    static JNIEnv libUnityEnv = {&libUnityNInterface};
+    static JNIInvokeInterface libUnityIInterface = {};
+    static JavaVM libUnityVm = {&libUnityIInterface};
+    static bool usingCustomVm = false;
+}
+
+JNIEnv* jni::interface::get_patched_env(JNIEnv* env) noexcept {
+    using namespace interface;
+    if (reinterpret_cast<JNIEnv const*>(&interface_extra<JNINativeInterface>(env->functions)) == env)
+        return env; // this is only the case when this is a constructed env
+
+    auto eptr = envPtrs.find(env);
+    if (eptr == envPtrs.end()) {
+        // the JNIEnv ends up being stored in the extra reserved member.
+        auto interf = new JNINativeInterface(libUnityNInterface);
+        interface_extra<JNINativeInterface>(interf) = interf;
+        auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
+        interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
+
+        eptr = envPtrs.insert({env, envptr}).first;
+    }
+
+    return eptr->second;
+}
 
 jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
     auto const len = env->GetStringUTFLength(str);
@@ -90,6 +111,11 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         log(ANDROID_LOG_VERBOSE, "Using libmodloader's modloader_main");
         libUnityNInterface = main(vm, env, soname);
 
+        libUnityNInterface.GetJavaVM = [](JNIEnv* env, JavaVM** vmPtr) {
+            *vmPtr = &libUnityVm; // always return same VM, as there should (i think) only be one
+            return 0;
+        };
+
         usingCustomVm = true;
         unityVm = &libUnityVm;
         libUnityIInterface = interface::make_passthrough_interface<JNIInvokeInterface>(&vm->functions);
@@ -100,18 +126,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             auto ret = invoke_original(ptr, &JNIInvokeInterface::AttachCurrentThread, &env, aarg);
             if (ret) return ret;
 
-            auto eptr = envPtrs.find(env);
-            if (eptr == envPtrs.end()) {
-                // the JNIEnv ends up being stored in the extra reserved member.
-                auto interf = new JNINativeInterface(libUnityNInterface);
-                interface_extra<JNINativeInterface>(interf) = interf;
-                auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
-                interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
-
-                eptr = envPtrs.insert({env, envptr}).first;
-            }
-
-            *envp = eptr->second;
+            *envp = get_patched_env(env);
             return ret;
         };
         libUnityIInterface.AttachCurrentThreadAsDaemon = [](JavaVM* ptr, JNIEnv** envp, void* aarg) {
@@ -120,19 +135,8 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             JNIEnv* env;
             auto ret = invoke_original(ptr, &JNIInvokeInterface::AttachCurrentThreadAsDaemon, &env, aarg);
             if (ret) return ret;
-
-            auto eptr = envPtrs.find(env);
-            if (eptr == envPtrs.end()) {
-                // the JNIEnv ends up being stored in the extra reserved member.
-                auto interf = new JNINativeInterface(libUnityNInterface);
-                interface_extra<JNINativeInterface>(interf) = interf;
-                auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
-                interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
-
-                eptr = envPtrs.insert({env, envptr}).first;
-            }
-
-            *envp = eptr->second;
+            
+            *envp = get_patched_env(env);
             return ret;
         };
         libUnityIInterface.GetEnv = [](JavaVM* ptr, void** envp, jint ver) {
@@ -141,19 +145,8 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             JNIEnv* env;
             auto ret = invoke_original(ptr, &JNIInvokeInterface::GetEnv, reinterpret_cast<void**>(&env), ver);
             if (ret) return ret;
-
-            auto eptr = envPtrs.find(env);
-            if (eptr == envPtrs.end()) {
-                // the JNIEnv ends up being stored in the extra reserved member.
-                auto interf = new JNINativeInterface(libUnityNInterface);
-                interface_extra<JNINativeInterface>(interf) = interf;
-                auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
-                interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
-
-                eptr = envPtrs.insert({env, envptr}).first;
-            }
-
-            *envp = eptr->second;
+            
+            *envp = get_patched_env(env);
             return ret;
         };
     }
@@ -204,6 +197,14 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         } else {
             log(ANDROID_LOG_INFO, "libunity does not have a JNI_OnLoad");
         }
+    }
+
+    // and here is something that is so incredibly dumb it might just work
+    if (usingCustomVm) {
+        // what i'm doing here is updating the pointer i'm given in the hopes that it will be propagated along this thread
+        auto ptr = interface::get_patched_env(env);
+        // note: doesn't work
+        *env = {ptr->functions};
     }
 
     logf(ANDROID_LOG_INFO, "Successfully loaded and initialized %s", soname);

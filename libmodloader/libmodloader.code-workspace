@@ -48,7 +48,8 @@
 			"utility": "cpp",
 			"vector": "cpp",
 			"version": "cpp",
-			"span": "cpp"
+			"span": "cpp",
+			"string": "cpp"
 		}
 	}
 }

@@ -35,5 +35,6 @@ namespace modloader::jit {
         { return protect(data, N, prot); }
     }
     
+    void* make_native_wrapper(void* original) noexcept;
 
 }

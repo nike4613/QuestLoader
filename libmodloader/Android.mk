@@ -33,6 +33,6 @@ LOCAL_CPPFLAGS  := -std=c++2a -fno-rtti -Os
 
 LOCAL_SHARED_LIBRARIES := main
 LOCAL_C_INCLUDES := ./include ./src 
-LOCAL_SRC_FILES  := $(call rwildcard,src/,*.cpp)
+LOCAL_SRC_FILES  := $(call rwildcard,src/,*.cpp) $(call rwildcard,src/,*.s)
 
 include $(BUILD_SHARED_LIBRARY)

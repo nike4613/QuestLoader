@@ -35,6 +35,8 @@ JNIEnv* jni::interface::get_patched_env(JNIEnv* env) noexcept {
     if (reinterpret_cast<JNIEnv const*>(&interface_extra<JNINativeInterface>(env->functions)) == env)
         return env; // this is only the case when this is a constructed env
 
+    logf(ANDROID_LOG_DEBUG, "Looking up patched JNIEnv for 0x%p", env);
+
     auto eptr = envPtrs.find(env);
     if (eptr == envPtrs.end()) {
         // the JNIEnv ends up being stored in the extra reserved member.
@@ -42,9 +44,12 @@ JNIEnv* jni::interface::get_patched_env(JNIEnv* env) noexcept {
         interface_extra<JNINativeInterface>(interf) = interf;
         auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
         interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
+        
+        logf(ANDROID_LOG_DEBUG, "Created new patched JNIEnv at 0x%p", envptr);
 
         eptr = envPtrs.insert({env, envptr}).first;
-    }
+    } else 
+        logf(ANDROID_LOG_DEBUG, "Found patched JNIEnv at 0x%p", eptr->second);
 
     return eptr->second;
 }
@@ -126,6 +131,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             auto ret = invoke_original(ptr, &JNIInvokeInterface::AttachCurrentThread, &env, aarg);
             if (ret) return ret;
 
+            log(ANDROID_LOG_DEBUG, "Looking up patched env in AttachCurrentThread");
             *envp = get_patched_env(env);
             return ret;
         };
@@ -136,6 +142,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             auto ret = invoke_original(ptr, &JNIInvokeInterface::AttachCurrentThreadAsDaemon, &env, aarg);
             if (ret) return ret;
             
+            log(ANDROID_LOG_DEBUG, "Looking up patched env in AttachCurrentThread");
             *envp = get_patched_env(env);
             return ret;
         };
@@ -146,6 +153,7 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
             auto ret = invoke_original(ptr, &JNIInvokeInterface::GetEnv, reinterpret_cast<void**>(&env), ver);
             if (ret) return ret;
             
+            log(ANDROID_LOG_DEBUG, "Looking up patched env in AttachCurrentThread");
             *envp = get_patched_env(env);
             return ret;
         };
@@ -197,14 +205,6 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         } else {
             log(ANDROID_LOG_INFO, "libunity does not have a JNI_OnLoad");
         }
-    }
-
-    // and here is something that is so incredibly dumb it might just work
-    if (usingCustomVm) {
-        // what i'm doing here is updating the pointer i'm given in the hopes that it will be propagated along this thread
-        auto ptr = interface::get_patched_env(env);
-        // note: doesn't work
-        *env = {ptr->functions};
     }
 
     logf(ANDROID_LOG_INFO, "Successfully loaded and initialized %s", soname);

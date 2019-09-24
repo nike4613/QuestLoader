@@ -3,11 +3,11 @@
 #
 
 .data
-.align 2
      /* ::modloader::jit::stubs::native_wrapper  */
 .global _ZN9modloader3jit5stubs14native_wrapperE
 .global _ZN9modloader3jit5stubs19native_wrapper_sizeE
 
+.align 4
 native_wrapper: # can use r9-r15, r16, r17 safely
                 # need to save r0-r7
     b #native_wrapper_body
@@ -15,12 +15,17 @@ native_wrapper: # can use r9-r15, r16, r17 safely
 target_addr: // this becomes exactly offset of 8
     # to be replaced with actual target address
     .quad 0x0123456789abcdef
+target_name:
+    .quad 0x0
 get_patched_env:
     .quad _ZN3jni9interface15get_patched_envEP7_JNIEnv
+log_target:
+    .quad 0x0
+//.align 4 // this needs to be 16-byte aligned it seems
 native_wrapper_body:
     # set up stack frame
     stp fp,lr,[sp, #0x0]
-    sub sp,sp,#0x50
+    sub sp,sp,#0x60
     mov fp,sp
 
     # save parameters (there is probably a better way to do this)
@@ -29,6 +34,20 @@ native_wrapper_body:
     stp x5, x6, [sp, #-0x20]
     stp x7, x8, [sp, #-0x10]
     //push {r1-r7} // save parameters 
+
+    ldr x16, log_target
+    cmp x16, #0
+    b.eq #nolog
+
+    str x0, [sp, #-0x50]
+
+    ldr x16, log_target
+    ldr x0, target_addr
+    ldr x1, target_name
+    blr x16
+
+    ldr x0, [sp, #-0x50]
+nolog:
 
     # call get_patched_env
     ldr x16, get_patched_env
@@ -41,7 +60,7 @@ native_wrapper_body:
     ldp x7, x8, [sp, #-0x10]
 
     # fix frame pointer and stack pointer
-    add sp,sp, #0x50
+    add sp,sp, #0x60
     ldp fp,lr, [sp, #0x0]
 
     ldr x16, target_addr

@@ -34,7 +34,7 @@ extern "C" JNINativeInterface modloader_main(JavaVM* vm, JNIEnv* env, std::strin
     iface.RegisterNatives = [](JNIEnv* env, jclass klass, JNINativeMethod const* methods_ptr, jint count) {
         using namespace jni::interface;
         std::span methods {const_cast<JNINativeMethod*>(methods_ptr), count};
-        int success = jit::mem::protect(methods, jit::mem::protection::read_write_execute); // ensure the protection is right
+        int success = mem::protect(methods, mem::protection::read_write_execute); // ensure the protection is right
         // the reason such a broad protection level is set is so that i don't accidentally mark some bit of code not executable
 
         logf(ANDROID_LOG_DEBUG, "mem::protect returned %d", success);

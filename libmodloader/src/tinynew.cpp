@@ -10,15 +10,17 @@
    - Eric Agan
      Elegant Invention
  */
- 
-#include <new>
+
 #include <malloc.h>
 #include "log.hpp"
- 
+#include "modloader/mem.hpp"
+
+[[nodiscard]]
 void* operator new(std::size_t size) {
     return malloc(size);
 }
  
+[[nodiscard]]
 void* operator new[](std::size_t size) {
     return malloc(size);
 }
@@ -37,10 +39,12 @@ void operator delete[](void* ptr) {
    rather than just eliminate exceptions.
  */
  
+[[nodiscard]]
 void* operator new(std::size_t size, const std::nothrow_t&) noexcept {
     return malloc(size);
 }
  
+[[nodiscard]]
 void* operator new[](std::size_t size, const std::nothrow_t&) noexcept {
     return malloc(size);
 }
@@ -50,6 +54,28 @@ void operator delete(void* ptr, const std::nothrow_t&) noexcept {
 }
  
 void operator delete[](void* ptr, const std::nothrow_t&) noexcept {
+    free(ptr);
+}
+
+/* 
+    Aligned new/delete
+*/
+
+[[nodiscard]]
+void* operator new(std::size_t size, std::align_val_t align) {
+    return memalign(static_cast<std::size_t>(align), size);
+}
+ 
+[[nodiscard]]
+void* operator new[](std::size_t size, std::align_val_t align) {
+    return memalign(static_cast<std::size_t>(align), size);
+}
+ 
+void operator delete(void* ptr, std::align_val_t align) noexcept {
+    free(ptr);
+}
+ 
+void operator delete[](void* ptr, std::align_val_t align) noexcept {
     free(ptr);
 }
 

@@ -24,7 +24,6 @@ namespace {
 
     // this is needed because libUnity stores the pointer, so this can never be invalidated
     static JNINativeInterface libUnityNInterface = {};
-    static JNIEnv libUnityEnv = {&libUnityNInterface};
     static JNIInvokeInterface libUnityIInterface = {};
     static JavaVM libUnityVm = {&libUnityIInterface};
     static bool usingCustomVm = false;
@@ -41,9 +40,9 @@ JNIEnv* jni::interface::get_patched_env(JNIEnv* env) noexcept {
     if (eptr == envPtrs.end()) {
         // the JNIEnv ends up being stored in the extra reserved member.
         auto interf = new JNINativeInterface(libUnityNInterface);
+        interface_original(interf) = reinterpret_cast<JNINativeInterface**>(env);
         interface_extra<JNINativeInterface>(interf) = interf;
         auto envptr = reinterpret_cast<JNIEnv*>(&interface_extra<JNINativeInterface>(interf));
-        interface_original(interf) = const_cast<JNINativeInterface**>(&env->functions);
         
         logf(ANDROID_LOG_DEBUG, "Created new patched JNIEnv at 0x%p", envptr);
 

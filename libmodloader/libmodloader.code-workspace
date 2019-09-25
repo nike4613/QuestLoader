@@ -49,7 +49,9 @@
 			"vector": "cpp",
 			"version": "cpp",
 			"span": "cpp",
-			"string": "cpp"
+			"string": "cpp",
+			"__tree": "cpp",
+			"map": "cpp"
 		}
 	}
 }

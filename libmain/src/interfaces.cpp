@@ -1,4 +1,5 @@
 #include "libmain.hpp"
+#include "log.hpp"
 
 using namespace jni::interface;
 
@@ -19,18 +20,21 @@ namespace detail {
     
     template<typename... Args>
     struct make_passthrough_helper {
-        template<typename O, typename T, typename F, F O::* member>
-        static auto varargs_form(T* o, Args... args, ...) { // this case cannot be a lambda because Clang cannot 
-            auto op = *reinterpret_cast<O**>(o);            // compile C varargs lambdas
-            return ((*interface_original(op))->*member)(
+        template<typename O, typename T, typename F, F O::* member, bool debug_print = false, typename NameProvider = void>
+        static auto varargs_form(T* o, Args... args, ...) { // this case cannot be a lambda because Clang cannot compile C varargs lambdas
+            auto op = *reinterpret_cast<O**>(o); // Debug logging is omitted because this vararg is already probably broken
+            return ((*interface_original(op))->*member)( // TODO: figure out how to actually wrap varargs properly (inline assembly?)      
                 reinterpret_cast<T*>(interface_original(op)), args...);
         }
-        template<typename O, typename T, typename F, F O::* member, bool is_varargs>
+        template<typename O, typename T, typename F, F O::* member, bool is_varargs, bool debug_print = false, typename NameProvider = void>
         static auto get_functor() noexcept {
             if constexpr (is_varargs) {
-                return &varargs_form<O, T, F, member>;
+                return &varargs_form<O, T, F, member, debug_print, NameProvider>;
             } else {
                 return [](T* o, Args... args) {
+                    if constexpr (debug_print) {
+                        logf(ANDROID_LOG_DEBUG, "Invoking wrapped JNI function %s for %p", NameProvider{}.name, o);
+                    }
                     auto op = *reinterpret_cast<O**>(o);
                     return ((*interface_original(op))->*member)(
                         reinterpret_cast<T*>(interface_original(op)), args...);
@@ -40,7 +44,7 @@ namespace detail {
     };
 }
 
-template<typename Obj, typename OwnType, typename FType, FType Obj::* member>
+template<typename Obj, typename OwnType, typename FType, FType Obj::* member, bool debug_print = false, typename NameProvider = void>
 auto make_passthrough() noexcept -> 
     util::alias_t<
         std::enable_if_t<
@@ -56,7 +60,7 @@ auto make_passthrough() noexcept ->
 {
     return detail::func_ptr_helper<FType>::args::rest
             ::template apply<detail::make_passthrough_helper>
-            ::template get_functor<Obj, OwnType, FType, member, detail::func_ptr_helper<FType>::is_varargs>();
+            ::template get_functor<Obj, OwnType, FType, member, detail::func_ptr_helper<FType>::is_varargs, debug_print, NameProvider>();
 }
 
 
@@ -84,7 +88,24 @@ namespace {
     using as_member = T O::*;
 }
 
-#define PASSTHROUGH(Interface, OwnType, var, member) var.member = make_passthrough<Interface, OwnType, std::remove_reference_t<decltype(var.member)>, &Interface::member>()
+#define INTERFACE_DEBUG
+
+#ifdef INTERFACE_DEBUG
+#  define PASSTHROUGH_DEBUG_ARGS(member) , true, NameProvider_##member
+#else
+#  define PASSTHROUGH_DEBUG_ARGS(member)
+#endif
+
+#define PASSTHROUGH_(Interface, OwnType, var, member) var.member = make_passthrough<Interface, OwnType, std::remove_reference_t<decltype(var.member)>, \
+                                                                                    &Interface::member PASSTHROUGH_DEBUG_ARGS(member)>()
+
+#ifdef INTERFACE_DEBUG
+#  define PASSTHROUGH(Interface, OwnType, var, member) struct NameProvider_##member { char const* name = #member; }; \
+                                                       PASSTHROUGH_(Interface, OwnType, var, member)
+#else
+#  define PASSTHROUGH(Interface, OwnType, var, member) PASSTHROUGH_(Interface, OwnType, var, member)
+#endif
+
 #define E(...) __VA_ARGS__
 
 template<>
@@ -141,7 +162,7 @@ JNINativeInterface LIBMAIN_EXPORT jni::interface::make_passthrough_interface(JNI
     M(AllocObject); N(NewObject);
     M(GetObjectClass); M(IsInstanceOf); M(GetMethodID);
     M(GetFieldID); M(GetStaticMethodID); M(GetStaticFieldID);
-    M(NewString); M(GetStringLength); M(GetStringLength);
+    M(NewString); M(GetStringLength);
     M(GetStringChars); M(ReleaseStringChars);
     M(NewStringUTF); M(GetStringUTFLength); M(GetStringUTFChars);
     M(ReleaseStringUTFChars); M(GetArrayLength);

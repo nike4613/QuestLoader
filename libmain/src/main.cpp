@@ -3,6 +3,7 @@
 
 #include "log.hpp"
 #include "libmain.hpp"
+#include "libmain_internal.hpp"
 
 #include <cstddef>
 
@@ -29,6 +30,9 @@ extern "C" jint LIBMAIN_EXPORT JNI_OnLoad(JavaVM* vm, void*) {
         return -1;
     }
 
+    log(ANDROID_LOG_VERBOSE, "Calling preload");
+    jni::modloader::preload();
+    
     log(ANDROID_LOG_INFO, "JNI_OnLoad done!");
 
     return JNI_VERSION_1_6;

@@ -3,6 +3,7 @@
 
 using namespace jni::interface;
 
+// TODO: eliminate namespace name
 namespace detail {
     template<typename> struct func_ptr_helper;
     template<typename R, typename ...Args>

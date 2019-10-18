@@ -1,4 +1,5 @@
 #include "libmain.hpp"
+#include "libmain_internal.hpp"
 #include "log.hpp"
 
 /*
@@ -53,11 +54,37 @@ JNIEnv* jni::interface::get_patched_env(JNIEnv* env) noexcept {
     return eptr->second;
 }
 
+namespace {
+    constexpr auto unityso = "libunity.so"sv;
+    constexpr auto modloaderso = "libmodloader.so"sv;
+}
+
+void jni::modloader::preload() noexcept {
+    log(ANDROID_LOG_VERBOSE, "Attempting to load libmodloader in jni::modloader::preload()");
+
+    libModLoader = dlopen(modloaderso.data(), RTLD_LAZY);
+    if (libUnityHandle == nullptr) {
+        logf(ANDROID_LOG_WARN, "Could not load libmodloader.so: %s", dlerror());
+        return;
+    }
+
+    log(ANDROID_LOG_VERBOSE, "libmodloader loaded");
+
+    auto pre = reinterpret_cast<modloader::preload_t*>(dlsym(libModLoader, "modloader_preload"));
+    if (pre == nullptr) {
+        logf(ANDROID_LOG_WARN, "libmodloader does not have modloader_preload: %s", dlerror());
+        return;
+    }
+
+    log(ANDROID_LOG_VERBOSE, "Calling modloader_preload");
+    pre();
+
+    log(ANDROID_LOG_VERBOSE, "Preloading done");
+}
+
 jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
     auto const len = env->GetStringUTFLength(str);
 
-    constexpr auto unityso = "libunity.so"sv;
-    constexpr auto modloaderso = "libmodloader.so"sv;
     constexpr auto sonameLen = std::max(unityso.length(), modloaderso.length());
 
     char soname[len + 1 + sonameLen + 1]; // use stack local to prevent allocation
@@ -91,13 +118,11 @@ jboolean jni::load(JNIEnv* env, jobject klass, jstring str) noexcept {
         auto endptr = std::copy(std::begin(modloaderso), std::end(modloaderso), soname + len + 1);
         *endptr = 0;
         
-        logf(ANDROID_LOG_VERBOSE, "Looking for libmodloader at %s", soname);
-
-        libModLoader = dlopen(soname, RTLD_LAZY);
         if (libModLoader == nullptr) {
-            logf(ANDROID_LOG_VERBOSE, "Looking for libmodloader as %s", modloaderso.data());
-            libModLoader = dlopen(modloaderso.data(), RTLD_LAZY);
-            if (libUnityHandle == nullptr) {
+            logf(ANDROID_LOG_VERBOSE, "libmodloader not preloaded; Looking for libmodloader at %s", soname);
+
+            libModLoader = dlopen(soname, RTLD_LAZY);
+            if (libModLoader == nullptr) {
                 auto err = dlerror();
                 logf(ANDROID_LOG_WARN, "Could not load libmodloader.so from %s: %s", soname, err);
                 goto loadLibUnity;

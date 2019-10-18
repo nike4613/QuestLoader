@@ -11,10 +11,13 @@
 
 #define CHECK_MODLOADER_MAIN CHECK_MODLOADER_FUNCTION(main)
 #define CHECK_MODLOADER_ACCEPT_UNITY_HANDLE CHECK_MODLOADER_FUNCTION(accept_unity_handle)
+#define CHECK_MODLOADER_PRELOAD CHECK_MODLOADER_FUNCTION(preload)
 
 namespace jni {
 
     namespace modloader {
+        // preload_t is called in JNIOnLoad
+        using preload_t = void() noexcept;
         // first, main is called. the interface it returns is given to LibUnity, but only after calling accept_unity_handle.
         // if you redirect GetJavaVM, it will be redirected to keep the patched chain alive.
         using main_t = JNINativeInterface(JavaVM* vm, JNIEnv* env, std::string_view loadSrc) noexcept;

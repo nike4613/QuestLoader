@@ -26,6 +26,10 @@ namespace {
     }
 }
 
+extern "C" void modloader_preload() noexcept {
+    log(ANDROID_LOG_VERBOSE, "modloader_preload called (should be really early)");
+}
+
 extern "C" JNINativeInterface modloader_main(JavaVM* vm, JNIEnv* env, std::string_view loadSrc) noexcept {
     logf(ANDROID_LOG_VERBOSE, "modloader_main called with vm: 0x%p, env: 0x%p, loadSrc: %s", vm, env, loadSrc.data());
 
@@ -58,5 +62,6 @@ extern "C" void modloader_accept_unity_handle(void* uhandle) noexcept {
     logf(ANDROID_LOG_VERBOSE, "modloader_accept_unity_handle called with uhandle: 0x%p", uhandle);
 }
 
+CHECK_MODLOADER_PRELOAD;
 CHECK_MODLOADER_MAIN;
 CHECK_MODLOADER_ACCEPT_UNITY_HANDLE;

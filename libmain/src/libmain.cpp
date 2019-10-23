@@ -63,7 +63,7 @@ void jni::modloader::preload() noexcept {
     log(ANDROID_LOG_VERBOSE, "Attempting to load libmodloader in jni::modloader::preload()");
 
     libModLoader = dlopen(modloaderso.data(), RTLD_LAZY);
-    if (libUnityHandle == nullptr) {
+    if (libModLoader == nullptr) {
         logf(ANDROID_LOG_WARN, "Could not load libmodloader.so: %s", dlerror());
         return;
     }
